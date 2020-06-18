@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/go-yaml/yaml"
+	"github.com/iancoleman/strcase"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -14,6 +15,7 @@ import (
 
 type File struct {
 	Services Services
+	Values   map[string]Type
 	fset     *token.FileSet
 	file     *ast.File
 }
@@ -41,18 +43,32 @@ func GenerateContainer(all *File, packageName string, outputFile string) (*File,
 		return nil, err
 	}
 
-	all.file.Decls = append(all.file.Decls,
-		all.Services.astContainerStruct(),
-		all.Services.astDefaultContainer(),
-		all.astNewContainerFunc())
+	imports := make(map[string]string)
+
+	for _, v := range all.Values {
+		imports[v.PackageName()] = v.LocalPackageName()
+	}
 
 	for _, serviceName := range all.Services.ServiceNames() {
 		definition := all.Services[serviceName]
-
-		// Add imports for type, interface and explicit imports.
-		for packageName, shortName := range definition.Imports() {
-			astutil.AddNamedImport(all.fset, all.file, shortName, packageName)
+		for packageName, shortName := range definition.Imports(imports) {
+			imports[packageName] = shortName
 		}
+	}
+
+	all.file.Decls = append(all.file.Decls,
+		all.astValuesStruct(),
+		all.Services.astContainerStruct(),
+		all.Services.astDefaultContainer(),
+		all.astNewContainerFunc(),
+	)
+
+	for _, s := range all.astContainerValuesSetters() {
+		all.file.Decls = append(all.file.Decls, s)
+	}
+
+	for _, serviceName := range all.Services.ServiceNames() {
+		definition := all.Services[serviceName]
 
 		all.file.Decls = append(all.file.Decls, &ast.FuncDecl{
 			Name: newIdent("Get" + serviceName),
@@ -74,6 +90,9 @@ func GenerateContainer(all *File, packageName string, outputFile string) (*File,
 		})
 	}
 
+	for packageName, shortName := range imports {
+		astutil.AddNamedImport(all.fset, all.file, shortName, packageName)
+	}
 	ast.SortImports(all.fset, all.file)
 
 	return all, nil
@@ -129,4 +148,31 @@ func (file *File) astNewContainerFunc() *ast.FuncDecl {
 	return newFunc("NewContainer", nil, []string{"*Container"}, newBlock(
 		newReturn(newCompositeLit("&Container", fields)),
 	))
+}
+
+func (file *File) astContainerValuesSetters() []*ast.FuncDecl {
+	decls := make([]*ast.FuncDecl, 0)
+
+	for k, v := range file.Values {
+		decls = append(decls,
+			&ast.FuncDecl{
+				Recv: newFieldList("container *Container"),
+				Name: newIdent(fmt.Sprintf("Set%s", strcase.ToCamel(k))),
+				Type: &ast.FuncType{
+					Params:  newFieldList(fmt.Sprintf("%s %s", k, v.LocalEntityType())),
+					Results: newFieldList("*Container"),
+				},
+				Body: newBlock(
+					&ast.AssignStmt{
+						Tok: token.ASSIGN,
+						Lhs: []ast.Expr{newIdent(fmt.Sprintf("container.values.%s", k))},
+						Rhs: []ast.Expr{newIdent(k)},
+					},
+					newReturn(newIdent("container")),
+				),
+			},
+		)
+	}
+
+	return decls
 }

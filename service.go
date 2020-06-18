@@ -15,14 +15,15 @@ const (
 )
 
 type Service struct {
-	Arguments  Arguments
-	Error      string
-	Import     []string
-	Interface  Type
-	Properties map[string]Expression
-	Returns    Expression
-	Scope      string
-	Type       Type
+	Arguments   Arguments
+	Error       string
+	Import      []string
+	Interface   Type
+	Properties  map[string]Expression
+	Returns     Expression
+	Scope       string
+	Type        Type
+	Constructor *Constructor
 }
 
 func (service *Service) ContainerFieldType(services Services) ast.Expr {
@@ -69,19 +70,52 @@ func (service *Service) InterfaceOrLocalEntityPointerType() string {
 	return service.Type.LocalEntityPointerType()
 }
 
-func (service *Service) Imports() map[string]string {
+func (service *Service) Imports(existing map[string]string) map[string]string {
 	imports := map[string]string{}
+	exists := func(pkg, lpn string) bool {
+		for k, v := range existing {
+			if k != pkg && v == lpn {
+				return true
+			}
+		}
+		return false
+	}
 
 	for _, packageName := range service.Import {
 		imports[packageName] = ""
 	}
 
 	if service.Type.PackageName() != "" {
-		imports[service.Type.PackageName()] = service.Type.LocalPackageName()
+		pkg := service.Type.PackageName()
+		lpn := service.Type.LocalPackageName()
+		if exists(pkg, lpn) {
+			service.Type = service.Type.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
+			imports[pkg] = service.Type.LocalPackageName()
+		} else {
+			imports[pkg] = lpn
+		}
 	}
 
 	if service.Interface.PackageName() != "" {
-		imports[service.Interface.PackageName()] = service.Interface.LocalPackageName()
+		pkg := service.Interface.PackageName()
+		lpn := service.Interface.LocalPackageName()
+		if exists(pkg, lpn) {
+			service.Interface = service.Interface.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
+			imports[pkg] = service.Interface.LocalPackageName()
+		} else {
+			imports[pkg] = lpn
+		}
+	}
+
+	if service.Constructor != nil {
+		pkg := service.Constructor.PackageName()
+		lpn := service.Constructor.LocalPackageName()
+		if exists(pkg, lpn) {
+			service.Constructor = service.Constructor.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
+			imports[pkg] = service.Constructor.LocalPackageName()
+		} else {
+			imports[pkg] = lpn
+		}
 	}
 
 	return imports
@@ -196,7 +230,50 @@ func (service *Service) astFunctionBody(file *File, services Services, name, ser
 	serviceTempVariable := "service"
 
 	// Instantiation
-	if service.Returns == "" {
+	if service.Constructor != nil {
+		args := make([]ast.Expr, 0)
+		for _, a := range service.Constructor.Arguments {
+			switch true {
+			case a.IsService():
+				args = append(args, newIdent(fmt.Sprintf("container.Get%s()", a.Name())))
+			case a.IsEnv():
+			case a.IsContainerValue():
+				args = append(args, newIdent(fmt.Sprintf("container.values.%s", a.Name())))
+			case a.IsValue():
+				args = append(args, newIdent(string(a)))
+			}
+		}
+
+		assign := &ast.AssignStmt{
+			Tok: token.DEFINE,
+			Lhs: []ast.Expr{newIdent(serviceTempVariable)},
+			Rhs: []ast.Expr{
+				&ast.CallExpr{
+					Fun:  newIdent(service.Constructor.LocalEntityName()),
+					Args: args,
+				},
+			},
+		}
+
+		if service.Constructor.Error {
+			assign.Lhs = append(assign.Lhs, newIdent("err"))
+		}
+
+		instantiation = []ast.Stmt{assign}
+
+		if service.Constructor.Error {
+			instantiation = append(instantiation, &ast.IfStmt{
+				Cond: newIdent("err != nil"),
+				Body: &ast.BlockStmt{
+					List: []ast.Stmt{
+						&ast.ExprStmt{
+							X: newIdent("panic(err)"),
+						},
+					},
+				},
+			})
+		}
+	} else if service.Returns == "" {
 		instantiation = []ast.Stmt{
 			&ast.AssignStmt{
 				Tok: token.DEFINE,

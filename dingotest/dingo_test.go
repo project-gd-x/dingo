@@ -1,7 +1,7 @@
 package dingotest_test
 
 import (
-	"github.com/elliotchance/dingo/dingotest"
+	"github.com/project-gd-x/dingo/dingotest"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

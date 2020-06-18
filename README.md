@@ -22,7 +22,7 @@ Easy, fast and type-safe dependency injection for Go.
 ## Installation
 
 ```bash
-go get -u github.com/elliotchance/dingo
+go get -u github.com/project-gd-x/dingo
 ```
 
 ## Building the Container

@@ -32,6 +32,33 @@ func (services Services) ServicesWithScope(scope string) Services {
 	return ss
 }
 
+func (file *File) astValuesStruct() *ast.GenDecl {
+	var fields []*ast.Field
+
+	for k, v := range file.Values {
+		fields = append(fields, &ast.Field{
+			Names: []*ast.Ident{
+				{Name: k},
+			},
+			Type: newIdent(v.LocalEntityType()),
+		})
+	}
+
+	return &ast.GenDecl{
+		Tok: token.TYPE,
+		Specs: []ast.Spec{
+			&ast.TypeSpec{
+				Name: newIdent("Values"),
+				Type: &ast.StructType{
+					Fields: &ast.FieldList{
+						List: fields,
+					},
+				},
+			},
+		},
+	}
+}
+
 // astContainer creates the Container struct.
 func (services Services) astContainerStruct() *ast.GenDecl {
 	var containerFields []*ast.Field
@@ -45,6 +72,11 @@ func (services Services) astContainerStruct() *ast.GenDecl {
 			Type: service.ContainerFieldType(services),
 		})
 	}
+
+	containerFields = append(containerFields, &ast.Field{
+		Names: []*ast.Ident{{Name: "values"}},
+		Type:  newIdent("Values"),
+	})
 
 	return &ast.GenDecl{
 		Tok: token.TYPE,

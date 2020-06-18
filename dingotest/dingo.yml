@@ -1,9 +1,24 @@
+values:
+  cfg: '*github.com/project-gd-x/cfg-pkg.SendEmail'
+  version: string
+
 services:
   SendEmail:
-    type: '*SendEmail'
+    type: '*github.com/project-gd-x/dingo/dingotest/go-sub-pkg.SendEmail'
     interface: EmailSender
     properties:
       From: '"hi@welcome.com"'
+
+  SendEmail2:
+    type: '*github.com/project-gd-x/dingo/go-sub-pkg.SendEmail'
+    interface: 'github.com/project-gd-x/dingo/go-sub-pkg.EmailSender'
+    constructor:
+      name: NewEmailSender
+      arguments:
+        - '@{CustomerWelcome}'
+        - '@{SomeEnv}'
+        - '#{cfg.Elastic}'
+        - '#{version}'
 
   CustomerWelcome:
     type: '*CustomerWelcome'
@@ -42,15 +57,15 @@ services:
     returns: '@{ParsedTime("13 Jan 06 15:04 MST")}'
 
   OtherPkg:
-    type: '*github.com/elliotchance/dingo/dingotest/go-sub-pkg.Person'
+    type: '*github.com/project-gd-x/dingo/dingotest/go-sub-pkg.Person'
 
   OtherPkg2:
-    type: '*github.com/elliotchance/dingo/dingotest/go-sub-pkg.Person'
-    interface: github.com/elliotchance/dingo/dingotest/go-sub-pkg.Greeter
+    type: '*github.com/project-gd-x/dingo/dingotest/go-sub-pkg.Person'
+    interface: github.com/project-gd-x/dingo/dingotest/go-sub-pkg.Greeter
     returns: go_sub_pkg.NewPerson()
 
   OtherPkg3:
-    type: github.com/elliotchance/dingo/dingotest/go-sub-pkg.Person
+    type: github.com/project-gd-x/dingo/dingotest/go-sub-pkg.Person
 
   SendEmailError:
     type: '*SendEmail'

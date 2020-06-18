@@ -64,6 +64,17 @@ func (ty Type) LocalPackageName() string {
 	return strings.Replace(lastPart, "-", "_", -1)
 }
 
+func (ty Type) ReplaceLocalPackageName(newName string) Type {
+	if ty.IsFunction() {
+		return ty
+	}
+
+	pkgNameParts := strings.Split(ty.UnversionedPackageName(), "/")
+	lastPart := pkgNameParts[len(pkgNameParts)-1]
+
+	return Type(strings.Replace(string(ty), lastPart+".", newName+".", -1))
+}
+
 func (ty Type) EntityName() string {
 	if ty.IsFunction() {
 		return ty.String()
