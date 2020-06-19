@@ -78,6 +78,11 @@ func (service *Service) Imports(existing map[string]string) map[string]string {
 				return true
 			}
 		}
+		for k, v := range imports {
+			if k != pkg && v == lpn {
+				return true
+			}
+		}
 		return false
 	}
 
