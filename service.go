@@ -14,6 +14,60 @@ const (
 	ScopeContainer = "container"
 )
 
+type Import struct {
+	Name              string
+	LocalName         string
+	Renamed           bool
+	OriginalLocalName string
+}
+type Imports struct {
+	Items []*Import
+}
+
+func (i *Imports) Add(name, localName string) *Import {
+	exists := func() *Import {
+		for _, imp := range i.Items {
+			if imp.Name == name && imp.OriginalLocalName == localName {
+				return imp
+			}
+		}
+
+		for _, imp := range i.Items {
+			if imp.LocalName == localName {
+				return imp
+			}
+		}
+
+		return nil
+	}()
+
+	n := &Import{
+		Name:      name,
+		LocalName: localName,
+	}
+
+	if exists != nil {
+		if exists.Name == n.Name {
+			return exists
+		}
+
+		n.OriginalLocalName = n.LocalName
+		n.LocalName = fmt.Sprintf("%s_%d", n.LocalName, len(i.Items))
+		n.Renamed = true
+	}
+
+	i.Items = append(i.Items, n)
+
+	return n
+}
+
+func (i *Imports) Merge(imports *Imports) *Imports {
+	for _, imp := range imports.Items {
+		i.Add(imp.Name, imp.LocalName)
+	}
+	return i
+}
+
 type Service struct {
 	Arguments   Arguments
 	Error       string
@@ -70,56 +124,37 @@ func (service *Service) InterfaceOrLocalEntityPointerType() string {
 	return service.Type.LocalEntityPointerType()
 }
 
-func (service *Service) Imports(existing map[string]string) map[string]string {
-	imports := map[string]string{}
-	exists := func(pkg, lpn string) bool {
-		for k, v := range existing {
-			if k != pkg && v == lpn {
-				return true
-			}
-		}
-		for k, v := range imports {
-			if k != pkg && v == lpn {
-				return true
-			}
-		}
-		return false
-	}
+func (service *Service) Imports(existing *Imports) *Imports {
+	imports := (&Imports{}).Merge(existing)
 
 	for _, packageName := range service.Import {
-		imports[packageName] = ""
+		imports.Add(packageName, "")
 	}
 
 	if service.Type.PackageName() != "" {
 		pkg := service.Type.PackageName()
 		lpn := service.Type.LocalPackageName()
-		if exists(pkg, lpn) {
-			service.Type = service.Type.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
-			imports[pkg] = service.Type.LocalPackageName()
-		} else {
-			imports[pkg] = lpn
+
+		if i := imports.Add(pkg, lpn); i.Renamed {
+			service.Type = service.Type.ReplaceLocalPackageName(i.LocalName)
 		}
 	}
 
 	if service.Interface.PackageName() != "" {
 		pkg := service.Interface.PackageName()
 		lpn := service.Interface.LocalPackageName()
-		if exists(pkg, lpn) {
-			service.Interface = service.Interface.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
-			imports[pkg] = service.Interface.LocalPackageName()
-		} else {
-			imports[pkg] = lpn
+
+		if i := imports.Add(pkg, lpn); i.Renamed {
+			service.Interface = service.Interface.ReplaceLocalPackageName(i.LocalName)
 		}
 	}
 
-	if service.Constructor != nil {
+	if service.Constructor != nil && service.Constructor.PackageName() != "" {
 		pkg := service.Constructor.PackageName()
 		lpn := service.Constructor.LocalPackageName()
-		if exists(pkg, lpn) {
-			service.Constructor = service.Constructor.ReplaceLocalPackageName(fmt.Sprintf("%s_%d", lpn, len(imports)))
-			imports[pkg] = service.Constructor.LocalPackageName()
-		} else {
-			imports[pkg] = lpn
+
+		if i := imports.Add(pkg, lpn); i.Renamed {
+			service.Constructor = service.Constructor.ReplaceLocalPackageName(i.LocalName)
 		}
 	}
 

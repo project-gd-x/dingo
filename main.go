@@ -1,7 +1,9 @@
 package main
 
 import (
+	"go/format"
 	"go/printer"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -26,7 +28,7 @@ func replaceAllStringSubmatchFunc(re *regexp.Regexp, str string, repl func([]str
 
 func main() {
 	dingoYMLPath := "dingo.yml"
-	outputFile := "dingo.go"
+	outputFile := "dingo.gen.go"
 
 	file, err := ParseYAMLFile(dingoYMLPath)
 	if err != nil {
@@ -46,5 +48,19 @@ func main() {
 	err = printer.Fprint(outFile, file.fset, file.file)
 	if err != nil {
 		log.Fatalln("writer:", err)
+	}
+
+	f, err := ioutil.ReadFile(outputFile)
+	if err != nil {
+		log.Fatalln("read file:", err)
+	}
+
+	formatted, err := format.Source(f)
+	if err != nil {
+		log.Fatalln("format file:", err)
+	}
+
+	if err = ioutil.WriteFile(outputFile, formatted, 0777); err != nil {
+		log.Fatalln("write formatted file:", err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -43,29 +44,24 @@ func GenerateContainer(all *File, packageName string, outputFile string) (*File,
 		return nil, err
 	}
 
-	imports := make(map[string]string)
+	imports := &Imports{}
 
 	for _, v := range all.Values {
-		imports[v.PackageName()] = v.LocalPackageName()
+		if v.PackageName() != "" {
+			imports.Add(v.PackageName(), v.LocalPackageName())
+		}
 	}
 
 	for _, serviceName := range all.Services.ServiceNames() {
 		definition := all.Services[serviceName]
-		for packageName, shortName := range definition.Imports(imports) {
-			imports[packageName] = shortName
-		}
+		imports = definition.Imports(imports)
 	}
 
 	all.file.Decls = append(all.file.Decls,
 		all.astValuesStruct(),
 		all.Services.astContainerStruct(),
-		all.Services.astDefaultContainer(),
 		all.astNewContainerFunc(),
 	)
-
-	for _, s := range all.astContainerValuesSetters() {
-		all.file.Decls = append(all.file.Decls, s)
-	}
 
 	for _, serviceName := range all.Services.ServiceNames() {
 		definition := all.Services[serviceName]
@@ -90,8 +86,8 @@ func GenerateContainer(all *File, packageName string, outputFile string) (*File,
 		})
 	}
 
-	for packageName, shortName := range imports {
-		astutil.AddNamedImport(all.fset, all.file, shortName, packageName)
+	for _, imp := range imports.Items {
+		astutil.AddNamedImport(all.fset, all.file, imp.LocalName, imp.Name)
 	}
 	ast.SortImports(all.fset, all.file)
 
@@ -145,9 +141,35 @@ func (file *File) astNewContainerFunc() *ast.FuncDecl {
 		}
 	}
 
-	return newFunc("NewContainer", nil, []string{"*Container"}, newBlock(
-		newReturn(newCompositeLit("&Container", fields)),
-	))
+	stmts := make([]ast.Stmt, 0)
+	stmts = append(stmts, &ast.AssignStmt{
+		Tok: token.DEFINE,
+		Lhs: []ast.Expr{newIdent("container")},
+		Rhs: []ast.Expr{newCompositeLit("&Container", fields)},
+	})
+
+	params := make([]string, 0)
+	keys := make([]string, 0)
+
+	for k, _ := range file.Values {
+		keys = append(keys, k)
+		stmts = append(stmts, &ast.AssignStmt{
+			Tok: token.ASSIGN,
+			Lhs: []ast.Expr{newIdent(fmt.Sprintf("container.values.%s", k))},
+			Rhs: []ast.Expr{newIdent(k)},
+		})
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := file.Values[k]
+		params = append(params, fmt.Sprintf("%s %s", k, v.LocalEntityType()))
+	}
+
+	stmts = append(stmts, newReturn(newIdent("container")))
+
+	return newFunc("NewContainer", params, []string{"*Container"}, newBlock(stmts...))
 }
 
 func (file *File) astContainerValuesSetters() []*ast.FuncDecl {
