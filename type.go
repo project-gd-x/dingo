@@ -58,7 +58,7 @@ func (ty Type) LocalPackageName() string {
 		return ""
 	}
 
-	pkgNameParts := strings.Split(ty.UnversionedPackageName(), "/")
+	pkgNameParts := strings.Split(ty.PackageName(), "/")
 	lastPart := pkgNameParts[len(pkgNameParts)-1]
 
 	return strings.Replace(lastPart, "-", "_", -1)
@@ -69,7 +69,7 @@ func (ty Type) ReplaceLocalPackageName(newName string) Type {
 		return ty
 	}
 
-	pkgNameParts := strings.Split(ty.UnversionedPackageName(), "/")
+	pkgNameParts := strings.Split(ty.PackageName(), "/")
 	lastPart := pkgNameParts[len(pkgNameParts)-1]
 
 	return Type(strings.Replace(string(ty), lastPart+".", newName+".", -1))

@@ -89,6 +89,7 @@ services:
   WhatsTheTime:
     type: '*WhatsTheTime'
     properties:
+
       clock: '@{Clock}'
 
   Signer:

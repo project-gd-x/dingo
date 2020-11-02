@@ -2,46 +2,43 @@
 package dingotest
 
 import (
-	""
 	clockwork "github.com/jonboulle/clockwork"
 	cfg_pkg "github.com/project-gd-x/cfg-pkg"
 	go_sub_pkg "github.com/project-gd-x/dingo/dingotest/go-sub-pkg"
-	go_sub_pkg_1 "github.com/project-gd-x/dingo/go-sub-pkg"
+	go_sub_pkg_4 "github.com/project-gd-x/dingo/go-sub-pkg"
 	"net/http"
 	"os"
 	time "time"
 )
 
 type Values struct {
-	cfg	*cfg_pkg.SendEmail
-	version	string
+	cfg     *cfg_pkg.SendEmail
+	version string
 }
 type Container struct {
-	AFunc			func (int, int) (bool, bool)
-	Clock			clockwork.Clock
-	CustomerWelcome		*CustomerWelcome
-	DependsOnTime		func(ParsedTime time.Time) time.Time
-	HTTPSignerClient	*HTTPSignerClient
-	Now			func() time.Time
-	OtherPkg		*go_sub_pkg.Person
-	OtherPkg2		go_sub_pkg.Greeter
-	OtherPkg3		*go_sub_pkg.Person
-	ParsedTime		func(value string) time.Time
-	SendEmail		EmailSender
-	SendEmail2		go_sub_pkg_1.EmailSender
-	SendEmailError		*SendEmail
-	Signer			func(req *http.Request) *Signer
-	SomeEnv			*string
-	WhatsTheTime		*WhatsTheTime
-	WithEnv1		*SendEmail
-	WithEnv2		*SendEmail
-	values			Values
+	AFunc            func(int, int) (bool, bool)
+	Clock            clockwork.Clock
+	CustomerWelcome  *CustomerWelcome
+	DependsOnTime    func(ParsedTime time.Time) time.Time
+	HTTPSignerClient *HTTPSignerClient
+	Now              func() time.Time
+	OtherPkg         *go_sub_pkg.Person
+	OtherPkg2        go_sub_pkg.Greeter
+	OtherPkg3        *go_sub_pkg.Person
+	ParsedTime       func(value string) time.Time
+	SendEmail        EmailSender
+	SendEmail2       go_sub_pkg_4.EmailSender
+	SendEmailError   *SendEmail
+	Signer           func(req *http.Request) *Signer
+	SomeEnv          *string
+	WhatsTheTime     *WhatsTheTime
+	WithEnv1         *SendEmail
+	WithEnv2         *SendEmail
+	values           Values
 }
 
-var DefaultContainer = NewContainer()
-
-func NewContainer() *Container {
-	return &Container{DependsOnTime: func(ParsedTime time.Time) time.Time {
+func NewContainer(cfg *cfg_pkg.SendEmail, version string) *Container {
+	container := &Container{DependsOnTime: func(ParsedTime time.Time) time.Time {
 		service := ParsedTime
 		return service
 	}, Now: func() time.Time {
@@ -57,23 +54,18 @@ func NewContainer() *Container {
 		service := NewSigner(req)
 		return service
 	}}
-}
-func (container *Container) SetCfg(cfg *cfg_pkg.SendEmail) *Container {
 	container.values.cfg = cfg
-	return container
-}
-func (container *Container) SetVersion(version string) *Container {
 	container.values.version = version
 	return container
 }
-func (container *Container) GetAFunc() func (int, int) (bool, bool) {
+func (container *Container) GetAFunc() func(int, int) (bool, bool) {
 	if container.AFunc == nil {
-		service := func (a, b int) (c, d bool) {
-  c = (a + b) != 0
-  d = container.GetSomeEnv() != ""
+		service := func(a, b int) (c, d bool) {
+			c = (a + b) != 0
+			d = container.GetSomeEnv() != ""
 
-  return
-}
+			return
+		}
 
 		container.AFunc = service
 	}
@@ -139,7 +131,7 @@ func (container *Container) GetSendEmail() EmailSender {
 	}
 	return container.SendEmail
 }
-func (container *Container) GetSendEmail2() go_sub_pkg_1.EmailSender {
+func (container *Container) GetSendEmail2() go_sub_pkg_4.EmailSender {
 	if container.SendEmail2 == nil {
 		service := NewEmailSender(container.GetCustomerWelcome(), container.GetSomeEnv(), container.values.cfg.Elastic, container.values.version)
 		container.SendEmail2 = service
